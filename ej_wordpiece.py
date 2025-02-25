@@ -119,7 +119,13 @@ def tokenize_wordpiece(sentence, vocab):
     return tokens
 
 # Probar con la oración corregida
-test_sentence = "El perro pequeño juega con la pelota."
+ruta2 = "materiales-20250207/test_sentences.txt"
+
+with open(ruta2, "r", encoding="utf-8") as file:
+    lines = file.readlines()
+
+test_sentence = " ".join(line.strip() for line in lines)
+
 tokenized_sentence = tokenize_wordpiece(test_sentence, vocab)
 
 print("\n📝 Tokenización corregida:", tokenized_sentence)
