@@ -1,89 +1,124 @@
-# CLAUDIA
-
 import collections
-import re
-from ej_tresprimeros import tokenize_by_spaces
+from tqdm import tqdm
 
-def train_wordpiece(text, vocab_size=100):
-
-    # Pre-tokenización por espacios
-    words = tokenize_by_spaces(text)
-    print(words)
-
-    # Inicialización del vocabulario
+def train_wordpiece(corpus, max_vocab_size=100, num_epochs=30, min_pair_freq=2):
     vocab = {"[UNK]": 0}
-    subwords = collections.defaultdict(int)
-    segmented_words = {}
-    
-    # Segmentación inicial en caracteres
-    for word in words:
-        chars = list(word)
-        segmented_words[word] = [chars[0]] + ["##" + c for c in chars[1:]]
+    word_freqs = collections.Counter(corpus.split())
+    subwords = {}
+    updated_words = {}  
 
-        for subword in segmented_words[word]:
-            subwords[subword] += 1
-    print(subwords)
-    
-    # Iterativamente fusionar pares más frecuentes
-    while len(vocab) < vocab_size:
+    # Inicializar vocabulario con caracteres individuales
+    for word, freq in word_freqs.items():
+        tokens = [word[0]] + ["##" + c for c in word[1:]]
+        updated_words[word] = tokens
+        for token in tokens:
+            subwords[token] = subwords.get(token, 0) + freq
+
+    vocab.update(subwords)  
+
+    progress_bar = tqdm(total=num_epochs, desc="Training WordPiece", unit="epoch")
+
+    for epoch in range(num_epochs):
         pairs = collections.defaultdict(int)
-        
-        # Contar pares de subpalabras consecutivas
-        for segments in segmented_words.values():
-            for i in range(len(segments) - 1):
-                pairs[(segments[i], segments[i + 1])] += 1
-        
+
+        # Contar pares de subpalabras
+        for word, symbols in updated_words.items():
+            for i in range(len(symbols) - 1):
+                pair = (symbols[i], symbols[i + 1])
+                pairs[pair] += word_freqs[word]  
+
         if not pairs:
             break
-        
-        # Seleccionar el par más frecuente
-        best_pair = max(pairs, key=pairs.get)
-        new_token = best_pair[0] + best_pair[1][2:] if best_pair[1].startswith("##") else best_pair[0] + best_pair[1]
-        
-        # Actualizar vocabulario
-        vocab[new_token] = pairs[best_pair]
-        
-        # Actualizar segmentación de palabras
-        for word in segmented_words:
-            segments = segmented_words[word]
-            new_segments = []
-            i = 0
-            while i < len(segments):
-                if i < len(segments) - 1 and (segments[i], segments[i + 1]) == best_pair:
-                    new_segments.append(new_token)
-                    i += 2
-                else:
-                    new_segments.append(segments[i])
-                    i += 1
-            segmented_words[word] = new_segments
-    
-    return vocab, segmented_words
 
-def tokenize_wordpiece(text, vocab):
-    words = text.split()
+        # Elegir el par más frecuente por encima del umbral
+        best_pair = max(pairs, key=pairs.get)
+        if pairs[best_pair] < min_pair_freq:
+            print("Detenido temprano: No hay más pares frecuentes.")
+            break
+
+        new_token = best_pair[0] + best_pair[1].replace("##", "")
+
+        if new_token in vocab:
+            continue  
+
+        vocab[new_token] = pairs[best_pair]
+
+        # Reemplazar el par con el nuevo token
+        for word, symbols in updated_words.items():
+            new_symbols = []
+            i = 0
+            while i < len(symbols):
+                if i < len(symbols) - 1 and (symbols[i], symbols[i + 1]) == best_pair:
+                    new_symbols.append(new_token)
+                    i += 2  
+                else:
+                    new_symbols.append(symbols[i])
+                    i += 1
+            updated_words[word] = new_symbols
+
+        print(f"Iteración {epoch+1}: Fusionando {best_pair} -> {new_token}")
+
+        # Si alcanzamos el tamaño máximo del vocabulario, detenemos
+        if len(vocab) >= max_vocab_size:
+            print("Límite de vocabulario alcanzado.")
+            break
+
+        progress_bar.update(1)
+
+    progress_bar.close()
+    return vocab
+
+# Cargar corpus desde archivo
+ruta = "materiales-20250207/training_sentences.txt"
+
+with open(ruta, "r", encoding="utf-8") as file:
+    lines = file.readlines()
+
+corpus = " ".join(line.strip() for line in lines)
+
+vocab = train_wordpiece(corpus, max_vocab_size=100, num_epochs=30)
+
+
+print("\n📌 Vocabulario final:", vocab)
+def tokenize_wordpiece(sentence, vocab):
     tokens = []
-    
+    words = sentence.split()
+
     for word in words:
-        subword_tokens = []
-        while word:
-            for i in range(len(word), 0, -1):
-                sub = word[:i] if word in vocab else "##" + word[:i]
-                if sub in vocab:
-                    subword_tokens.append(sub)
-                    word = word[i:]
+        sub_tokens = []
+        start = 0
+
+        while start < len(word):
+            match_found = False
+
+            # Intentar encontrar el token más largo en el vocabulario
+            for end in range(len(word), start, -1):
+                subword = word[start:end]
+                subword_with_prefix = "##" + subword if start > 0 else subword  # Prefijo "##" para subpalabras
+
+                if subword in vocab:  # Priorizar tokens completos
+                    sub_tokens.append(subword)
+                    start = end
+                    match_found = True
                     break
-            else:
-                subword_tokens.append("[UNK]")
-                break
-        
-        tokens.extend(subword_tokens)
-    
+                elif subword_with_prefix in vocab:
+                    sub_tokens.append(subword_with_prefix)
+                    start = end
+                    match_found = True
+                    break
+
+            if not match_found:
+                # Si no encuentra un token válido, marcarlo como desconocido
+                sub_tokens.append("[UNK]")
+                start += 1  
+
+        tokens.extend(sub_tokens)
+
     return tokens
 
-# Ejemplo de uso
-corpus = "El gato duerme tranquilo. El perro ladra al cartero."
-vocab, segmented_words = train_wordpiece(corpus, vocab_size=50)
+# Probar con la oración corregida
+test_sentence = "El perro pequeño juega con la pelota."
+tokenized_sentence = tokenize_wordpiece(test_sentence, vocab)
 
-text = "El gato corre rápido."
-tokens = tokenize_wordpiece(text, vocab)
-print("Tokens:", tokens)
+print("\n📝 Tokenización corregida:", tokenized_sentence)
+
