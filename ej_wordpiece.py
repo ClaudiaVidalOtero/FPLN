@@ -78,8 +78,10 @@ corpus = " ".join(line.strip() for line in lines)
 
 vocab = train_wordpiece(corpus, max_vocab_size=100, num_epochs=30)
 
-
 print("\n📌 Vocabulario final:", vocab)
+
+
+
 def tokenize_wordpiece(sentence, vocab):
     tokens = []
     words = sentence.split()
