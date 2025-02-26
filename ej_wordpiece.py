@@ -7,7 +7,7 @@ def train_wordpiece(corpus, max_vocab_size=100, num_epochs=30, min_pair_freq=2):
     subwords = {}
     updated_words = {}  
 
-    # Inicializar vocabulario con caracteres individuales
+    # Inicializamos vocabulario con caracteres individuales
     for word, freq in word_freqs.items():
         tokens = [word[0]] + ["##" + c for c in word[1:]]
         updated_words[word] = tokens
@@ -30,7 +30,7 @@ def train_wordpiece(corpus, max_vocab_size=100, num_epochs=30, min_pair_freq=2):
         if not pairs:
             break
 
-        # Elegir el par más frecuente por encima del umbral
+        # Elegir el par más frecuente por encima del umbral 
         best_pair = max(pairs, key=pairs.get)
         if pairs[best_pair] < min_pair_freq:
             print("Detenido temprano: No hay más pares frecuentes.")
@@ -58,7 +58,7 @@ def train_wordpiece(corpus, max_vocab_size=100, num_epochs=30, min_pair_freq=2):
 
         print(f"Iteración {epoch+1}: Fusionando {best_pair} -> {new_token}")
 
-        # Si alcanzamos el tamaño máximo del vocabulario, detenemos
+        # Si alcanzamos el tamaño máximo del vocabulario, detenemos el entrenamiento
         if len(vocab) >= max_vocab_size:
             print("Límite de vocabulario alcanzado.")
             break
@@ -67,20 +67,6 @@ def train_wordpiece(corpus, max_vocab_size=100, num_epochs=30, min_pair_freq=2):
 
     progress_bar.close()
     return vocab
-
-# Cargar corpus desde archivo
-ruta = "materiales-20250207/training_sentences.txt"
-
-with open(ruta, "r", encoding="utf-8") as file:
-    lines = file.readlines()
-
-corpus = " ".join(line.strip() for line in lines)
-
-vocab = train_wordpiece(corpus, max_vocab_size=100, num_epochs=30)
-
-print("\n📌 Vocabulario final:", vocab)
-
-
 
 def tokenize_wordpiece(sentence, vocab):
     tokens = []
@@ -93,24 +79,22 @@ def tokenize_wordpiece(sentence, vocab):
         while start < len(word):
             match_found = False
 
-            # Intentar encontrar el token más largo en el vocabulario
             for end in range(len(word), start, -1):
                 subword = word[start:end]
                 subword_with_prefix = "##" + subword if start > 0 else subword  # Prefijo "##" para subpalabras
 
-                if subword in vocab:  # Priorizar tokens completos
-                    sub_tokens.append(subword)
+                if subword_with_prefix in vocab:
+                    sub_tokens.append(subword_with_prefix)
                     start = end
                     match_found = True
                     break
-                elif subword_with_prefix in vocab:
-                    sub_tokens.append(subword_with_prefix)
+                elif subword in vocab and start == 0:
+                    sub_tokens.append(subword)
                     start = end
                     match_found = True
                     break
 
             if not match_found:
-                # Si no encuentra un token válido, marcarlo como desconocido
                 sub_tokens.append("[UNK]")
                 start += 1  
 
@@ -118,15 +102,29 @@ def tokenize_wordpiece(sentence, vocab):
 
     return tokens
 
-# Probar con la oración corregida
+
+# Cargamos corpus de entrenamiento desde archivo
+ruta = "materiales-20250207/training_sentences.txt"
+
+with open(ruta, "r", encoding="utf-8") as file:
+    lines = file.readlines()
+
+corpus_train = " ".join(line.strip() for line in lines)
+
+vocab = train_wordpiece(corpus_train, max_vocab_size=100, num_epochs=30)
+
+print("\n📌 Vocabulario final:", vocab)
+
+
+# Cargamos corpus de test desde archivo
 ruta2 = "materiales-20250207/test_sentences.txt"
 
 with open(ruta2, "r", encoding="utf-8") as file:
     lines = file.readlines()
 
-test_sentence = " ".join(line.strip() for line in lines)
+corpus_test = " ".join(line.strip() for line in lines)
 
-tokenized_sentence = tokenize_wordpiece(test_sentence, vocab)
+tokenized_sentence = tokenize_wordpiece(corpus_test, vocab)
 
-print("\n📝 Tokenización corregida:", tokenized_sentence)
+print("\n📝 Tokenización:", tokenized_sentence)
 
