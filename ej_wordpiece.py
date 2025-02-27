@@ -1,7 +1,7 @@
 import collections
 from tqdm import tqdm
 
-def train_wordpiece(corpus, max_vocab_size=100, num_epochs=30, min_pair_freq=2):
+def train_wordpiece(corpus, max_vocab_size=100, num_epochs=30, min_pair_freq=1):
     vocab = {"[UNK]": 0}
     word_freqs = collections.Counter(corpus.split())
     subwords = {}
@@ -111,7 +111,7 @@ with open(ruta, "r", encoding="utf-8") as file:
 
 corpus_train = " ".join(line.strip() for line in lines)
 
-vocab = train_wordpiece(corpus_train, max_vocab_size=100, num_epochs=30)
+vocab = train_wordpiece(corpus_train, max_vocab_size=150, num_epochs=100)
 
 print("\n📌 Vocabulario final:", vocab)
 
