@@ -1,49 +1,53 @@
 import collections
 from tqdm import tqdm
+import matplotlib.pyplot as plt
 
-def train_wordpiece(corpus, max_vocab_size=100, num_epochs=30, min_pair_freq=1):
+
+def train_wordpiece(corpus, max_vocab_size=100, min_pair_freq=1):
     vocab = {"[UNK]": 0}
     word_freqs = collections.Counter(corpus.split())
     subwords = {}
-    updated_words = {}  
-
-    # Inicializamos vocabulario con caracteres individuales
+    updated_words = {}
+    
+    # Inicializar vocabulario con caracteres individuales
     for word, freq in word_freqs.items():
         tokens = [word[0]] + ["##" + c for c in word[1:]]
         updated_words[word] = tokens
         for token in tokens:
             subwords[token] = subwords.get(token, 0) + freq
-
-    vocab.update(subwords)  
-
-    progress_bar = tqdm(total=num_epochs, desc="Training WordPiece", unit="epoch")
-
-    for epoch in range(num_epochs):
+    
+    vocab.update(subwords)
+    print("Entrenando el algoritmo WordPiece...")
+    while len(vocab) < max_vocab_size:
+        
         pairs = collections.defaultdict(int)
-
+        
         # Contar pares de subpalabras
         for word, symbols in updated_words.items():
             for i in range(len(symbols) - 1):
                 pair = (symbols[i], symbols[i + 1])
-                pairs[pair] += word_freqs[word]  
-
+                pairs[pair] += word_freqs[word]
+        
         if not pairs:
             break
-
-        # Elegir el par más frecuente por encima del umbral 
+        
+        # Elegir el par más frecuente
         best_pair = max(pairs, key=pairs.get)
         if pairs[best_pair] < min_pair_freq:
             print("Detenido temprano: No hay más pares frecuentes.")
             break
-
-        new_token = best_pair[0] + best_pair[1].replace("##", "")
-
+        
+        # Fusionar eliminando ## que no van al principio
+        new_token = best_pair[0].replace("##", "") + best_pair[1].replace("##", "")
+        if not best_pair[0].startswith("##"):
+            new_token = best_pair[0] + best_pair[1].replace("##", "")
+        
         if new_token in vocab:
-            continue  
-
+            continue
+        
         vocab[new_token] = pairs[best_pair]
-
-        # Reemplazar el par con el nuevo token
+        
+        # Actualizar segmentaciones
         for word, symbols in updated_words.items():
             new_symbols = []
             i = 0
@@ -55,18 +59,13 @@ def train_wordpiece(corpus, max_vocab_size=100, num_epochs=30, min_pair_freq=1):
                     new_symbols.append(symbols[i])
                     i += 1
             updated_words[word] = new_symbols
-
-        print(f"Iteración {epoch+1}: Fusionando {best_pair} -> {new_token}")
-
-        # Si alcanzamos el tamaño máximo del vocabulario, detenemos el entrenamiento
+        
         if len(vocab) >= max_vocab_size:
             print("Límite de vocabulario alcanzado.")
             break
-
-        progress_bar.update(1)
-
-    progress_bar.close()
+    
     return vocab
+
 
 def tokenize_wordpiece(sentence, vocab):
     tokens = []
@@ -95,36 +94,15 @@ def tokenize_wordpiece(sentence, vocab):
                     break
 
             if not match_found:
-                sub_tokens.append("[UNK]")
-                start += 1  
-
-        tokens.extend(sub_tokens)
+                # Si alguna parte de la palabra no está en el vocabulario, se descarta todo y se usa [UNK]
+                sub_tokens = ["[UNK]"]
+                break  
+        
+        # Verificar si todos los sub_tokens tienen solo una letra o número
+        if all(len(token.replace("##", "")) == 1 for token in sub_tokens) or all(token.replace("##", "").isdigit() for token in sub_tokens):
+            tokens.append("[UNK]")
+        else:
+            tokens.append(" ".join(sub_tokens))
 
     return tokens
-
-
-# Cargamos corpus de entrenamiento desde archivo
-ruta = "materiales-20250207/training_sentences.txt"
-
-with open(ruta, "r", encoding="utf-8") as file:
-    lines = file.readlines()
-
-corpus_train = " ".join(line.strip() for line in lines)
-
-vocab = train_wordpiece(corpus_train, max_vocab_size=150, num_epochs=100)
-
-print("\n📌 Vocabulario final:", vocab)
-
-
-# Cargamos corpus de test desde archivo
-ruta2 = "materiales-20250207/test_sentences.txt"
-
-with open(ruta2, "r", encoding="utf-8") as file:
-    lines = file.readlines()
-
-corpus_test = " ".join(line.strip() for line in lines)
-
-tokenized_sentence = tokenize_wordpiece(corpus_test, vocab)
-
-print("\n📝 Tokenización:", tokenized_sentence)
 
