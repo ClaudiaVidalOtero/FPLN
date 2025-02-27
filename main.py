@@ -52,7 +52,7 @@ def compare_tokenization_methods():
         "Espacios": tokenize_by_spaces,
         "Puntuación": tokenize_by_punctuation,
         "N-gramas (n=2)": lambda text: tokenize_by_ngrams(text, 2),
-        "WordPiece": lambda text: train_wordpiece(text, max_vocab_size=3000),
+        "WordPiece": lambda text: train_wordpiece(text, max_vocab_size=300),
     }
 
     vocab_sizes = {method: [] for method in tokenization_methods}
