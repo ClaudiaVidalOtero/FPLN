@@ -3,7 +3,7 @@ from tqdm import tqdm
 import matplotlib.pyplot as plt
 
 
-def train_wordpiece(corpus, max_vocab_size=100, min_pair_freq=1):
+def train_wordpiece(corpus, max_vocab_size, min_pair_freq=1):
     vocab = {"[UNK]": 0}
     word_freqs = collections.Counter(corpus.split())
     subwords = {}
@@ -29,6 +29,7 @@ def train_wordpiece(corpus, max_vocab_size=100, min_pair_freq=1):
                 pairs[pair] += word_freqs[word]
         
         if not pairs:
+            print ("no hay pares")
             break
         
         # Elegir el par más frecuente
@@ -41,12 +42,9 @@ def train_wordpiece(corpus, max_vocab_size=100, min_pair_freq=1):
         new_token = best_pair[0].replace("##", "") + best_pair[1].replace("##", "")
         if not best_pair[0].startswith("##"):
             new_token = best_pair[0] + best_pair[1].replace("##", "")
-        
-        if new_token in vocab:
-            continue
-        
+    
         vocab[new_token] = pairs[best_pair]
-        
+    
         # Actualizar segmentaciones
         for word, symbols in updated_words.items():
             new_symbols = []
@@ -105,4 +103,10 @@ def tokenize_wordpiece(sentence, vocab):
             tokens.append(" ".join(sub_tokens))
 
     return tokens
+
+"""majesty_path = "materiales-20250207/majesty_speeches.txt"
+with open(majesty_path, "r", encoding="utf-8") as file:
+        corpus_majesty = [line.strip() for line in file.readlines() if line.strip()]
+corpus_majesty_text = " ".join(corpus_majesty)
+vocab = train_wordpiece(corpus_majesty_text,3000,1)"""
 
