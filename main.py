@@ -26,15 +26,15 @@ with open(majesty_path, "r", encoding="utf-8") as file:
 
 # Función para ejecutar los algoritmos de tokenización por espacios, puntuación y ngramas
 def print_test():
-    vocab_spaces = tokenize_by_spaces(corpus_test)
+    vocab_spaces = tokenize_by_spaces(" ".join(corpus_test))
     print(f"Vocabulario final tokenizado por espacios:", vocab_spaces)
     print("_____________________________________________________________________")
 
-    vocab_punctuation = tokenize_by_punctuation(corpus_test)
+    vocab_punctuation = tokenize_by_punctuation(" ".join(corpus_test))
     print(f"Vocabulario final tokenizado por puntuación:", vocab_punctuation)
     print("_____________________________________________________________________")
 
-    vocab_ngrams = tokenize_by_ngrams(corpus_test, 2)
+    vocab_ngrams = tokenize_by_ngrams(" ".join(corpus_test), 2)
     print(f"Vocabulario final tokenizado por ngramas (n = 2):", vocab_ngrams)
 
 
@@ -44,7 +44,7 @@ def print_wordpiece():
       
     for vocab_size in [100, 150, 200]:
 
-        vocab_wordpiece = train_wordpiece(" ".join(corpus_train), max_vocab_size=vocab_size)
+        vocab_wordpiece, _ = train_wordpiece(" ".join(corpus_train), max_vocab_size=vocab_size)
 
         print(f"Vocabulario WordPiece ({vocab_size} palabras):", vocab_wordpiece)
         print("_____________________________________________________________________")
@@ -53,7 +53,7 @@ def print_wordpiece():
         print("\nTokenización en conjunto de entrenamiento de WordPiece:")
         with open(train_path, 'r', encoding='utf-8') as train_file:
             for line in train_file:
-                resultado = tokenize_wordpiece(line, vocab_wordpiece)  
+                resultado= tokenize_wordpiece(line, vocab_wordpiece)  
                 print(f"Input: '{line}' -> Tokens: {resultado}")
  
         print("_____________________________________________________________________")
@@ -74,7 +74,7 @@ def print_bpe():
         
     for vocab_size in [100, 150, 200]:
         
-        vocab_bpe = train_bpe(train_path, vocab_size)
+        vocab_bpe, _= train_bpe(train_path, vocab_size)
 
         print(f"Vocabulario final BPE ({vocab_size} palabras):", vocab_bpe)
         print("_____________________________________________________________________")
@@ -103,6 +103,8 @@ def compare_tokenization_methods():
     corpus_majesty_text = " ".join(corpus_majesty)
     wordpiece_vocab, wordpiece_vocab_growth = train_wordpiece(corpus_majesty_text, max_vocab_size=3000)
     bpe_rules, bpe_vocab_growth = train_bpe(majesty_path, vocab_size=3000)
+
+    print(wordpiece_vocab)
 
     # Diccionario de métodos de tokenización
     tokenizer_methods = {

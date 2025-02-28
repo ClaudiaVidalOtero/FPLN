@@ -40,10 +40,17 @@ def train_wordpiece(corpus, max_vocab_size, min_pair_freq=1):
             print("Detenido temprano: No hay más pares frecuentes.")
             break
         
-        # Fusionar eliminando ## que no van al principio
-        new_token = best_pair[0].replace("##", "") + best_pair[1].replace("##", "")
-        if not best_pair[0].startswith("##"):
+        if best_pair[0].startswith("##") or best_pair[1].startswith("##"):
             new_token = best_pair[0] + best_pair[1].replace("##", "")
+        else:
+            new_token = best_pair[0] + best_pair[1]
+
+        if not best_pair[0].startswith("##") and best_pair[1].startswith("##"):
+            new_token = best_pair[0] + best_pair[1]
+
+        if best_pair[0].startswith("##") and not best_pair[1].startswith("##"):
+            new_token = best_pair[0] + "##" + best_pair[1]
+
     
         vocab[new_token] = pairs[best_pair]
     

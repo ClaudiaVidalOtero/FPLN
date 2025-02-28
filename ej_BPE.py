@@ -67,17 +67,3 @@ def tokenize_bpe(linea, reglas_fusion):
     
     tokens = [token for palabra in palabras for token in segmentacion[palabra]]
     return tokens
-
-if __name__ == "__main__":
-    archivo_entrada = "materiales-20250207/training_sentences.txt"
-    archivo_test = "materiales-20250207/test_sentences.txt"
- 
-    vocab_size = 150
-    reglas = train_bpe(archivo_entrada, vocab_size)
-    
-    with open(archivo_test, "r", encoding="utf-8") as f:
-        for linea in f:
-            linea = linea.strip()
-            if linea:
-                tokens = tokenize_bpe(linea, reglas)
-                print(f"Input: '{linea}' -> Tokens: {tokens}")
