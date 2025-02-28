@@ -101,38 +101,44 @@ def compare_tokenization_methods():
     
     # Convertir corpus_majesty a un solo string para train_wordpiece
     corpus_majesty_text = " ".join(corpus_majesty)
-    wordpiece_vocab = train_wordpiece(corpus_majesty_text, max_vocab_size=3000)
-    bpe_rules = train_bpe(majesty_path, vocab_size=3000)
-    
+    wordpiece_vocab, wordpiece_vocab_growth = train_wordpiece(corpus_majesty_text, max_vocab_size=3000)
+    bpe_rules, bpe_vocab_growth = train_bpe(majesty_path, vocab_size=3000)
+
+    # Diccionario de métodos de tokenización
     tokenizer_methods = {
         "Espacios": tokenize_by_spaces,
         "Puntuación": tokenize_by_punctuation,
-        "N-Gramas": lambda text: tokenize_by_ngrams(text, 2),
+        "N-Gramas (2)": lambda text: tokenize_by_ngrams(text, 2),
         "WordPiece": lambda text: tokenize_wordpiece(text, wordpiece_vocab),
         "BPE": lambda text: tokenize_bpe(text, bpe_rules)
     }
-    
-    sentences = corpus_majesty  
-    
+
+    sentences = corpus_majesty
     if max_sentences:
         sentences = sentences[:max_sentences]
-    
+
     vocab_growth = {method: [] for method in tokenizer_methods.keys()}
     vocab_sets = {method: set() for method in tokenizer_methods.keys()}
-    
+
+    # Calcular evolución del vocabulario
     for i, sentence in enumerate(sentences, start=1):
         for method, tokenizer in tokenizer_methods.items():
             tokens = tokenizer(sentence)
             vocab_sets[method].update(tokens)
             vocab_growth[method].append(len(vocab_sets[method]))
-        
+
+    # Agregar las evoluciones de WordPiece y BPE preentrenadas
+    vocab_growth["WordPiece"] = wordpiece_vocab_growth[:len(sentences)]
+    vocab_growth["BPE"] = bpe_vocab_growth[:len(sentences)]
+
+    # Graficar todas las evoluciones
     plt.figure(figsize=(10, 6))
     for method, growth in vocab_growth.items():
         plt.plot(range(1, len(growth) + 1), growth, label=method)
-    
+
     plt.xlabel("Número de oraciones procesadas")
     plt.ylabel("Tamaño del vocabulario (tokens únicos)")
-    plt.title("Evolución del tamaño del vocabulario")
+    plt.title("Evolución del tamaño del vocabulario entre métodos de tokenización")
     plt.legend()
     plt.grid()
     plt.show()

@@ -13,6 +13,8 @@ def train_bpe(ruta_archivo, vocab_size=100):
     
     segmentacion = {palabra: list(palabra) for palabra in frecuencia}
     reglas_fusion = []
+    vocab_size_over_time = [len(set(c for palabra in segmentacion.values() for c in palabra))]
+
     
     while len(segmentacion) < vocab_size:
         pares = defaultdict(int)
@@ -42,7 +44,7 @@ def train_bpe(ruta_archivo, vocab_size=100):
         
         segmentacion = nueva_segmentacion
     
-    return reglas_fusion
+    return reglas_fusion, vocab_size_over_time
 
 def tokenize_bpe(linea, reglas_fusion):
     palabras = linea.split()

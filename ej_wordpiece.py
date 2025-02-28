@@ -8,6 +8,8 @@ def train_wordpiece(corpus, max_vocab_size, min_pair_freq=1):
     word_freqs = collections.Counter(corpus.split())
     subwords = {}
     updated_words = {}
+    vocab_size_over_time = []  # Para almacenar la evolución del vocabulario
+
     
     # Inicializar vocabulario con caracteres individuales
     for word, freq in word_freqs.items():
@@ -61,8 +63,9 @@ def train_wordpiece(corpus, max_vocab_size, min_pair_freq=1):
         if len(vocab) >= max_vocab_size:
             print("Límite de vocabulario alcanzado.")
             break
+        vocab_size_over_time.append(len(vocab))
     
-    return vocab
+    return vocab, vocab_size_over_time
 
 
 def tokenize_wordpiece(sentence, vocab):
