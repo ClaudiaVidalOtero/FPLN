@@ -40,17 +40,12 @@ def train_wordpiece(corpus, max_vocab_size, min_pair_freq=1):
             print("Detenido temprano: No hay más pares frecuentes.")
             break
         
-        if best_pair[0].startswith("##") or best_pair[1].startswith("##"):
-            new_token = best_pair[0] + best_pair[1].replace("##", "")
+        # Fusionar eliminando ## que no van al principio
+        # Determinar si el nuevo token debe llevar '##'
+        if best_pair[0].startswith("##"):
+            new_token = "##" + best_pair[0].replace("##", "") + best_pair[1].replace("##", "")
         else:
-            new_token = best_pair[0] + best_pair[1]
-
-        if not best_pair[0].startswith("##") and best_pair[1].startswith("##"):
-            new_token = best_pair[0] + best_pair[1]
-
-        if best_pair[0].startswith("##") and not best_pair[1].startswith("##"):
-            new_token = best_pair[0] + "##" + best_pair[1]
-
+            new_token = best_pair[0] + best_pair[1].replace("##", "")
     
         vocab[new_token] = pairs[best_pair]
     
@@ -113,10 +108,4 @@ def tokenize_wordpiece(sentence, vocab):
             tokens.append(" ".join(sub_tokens))
 
     return tokens
-
-"""majesty_path = "materiales-20250207/majesty_speeches.txt"
-with open(majesty_path, "r", encoding="utf-8") as file:
-        corpus_majesty = [line.strip() for line in file.readlines() if line.strip()]
-corpus_majesty_text = " ".join(corpus_majesty)
-vocab = train_wordpiece(corpus_majesty_text,3000,1)"""
 

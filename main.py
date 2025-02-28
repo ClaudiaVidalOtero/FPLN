@@ -96,15 +96,15 @@ def print_bpe():
 
 
 # Función para comparar la evolución del vocabulario entre métodos de tokenización
-def compare_tokenization_methods():
+def compare_methods():
     max_sentences = None
     
-    # Convertir corpus_majesty a un solo string para train_wordpiece
+    # Convertir corpus_majesty a un solo string para entrenar WordPiece
     corpus_majesty_text = " ".join(corpus_majesty)
+    
+    # Entrenar WordPiece y BPE, obteniendo su evolución
     wordpiece_vocab, wordpiece_vocab_growth = train_wordpiece(corpus_majesty_text, max_vocab_size=3000)
     bpe_rules, bpe_vocab_growth = train_bpe(majesty_path, vocab_size=3000)
-
-    print(wordpiece_vocab)
 
     # Diccionario de métodos de tokenización
     tokenizer_methods = {
@@ -129,9 +129,17 @@ def compare_tokenization_methods():
             vocab_sets[method].update(tokens)
             vocab_growth[method].append(len(vocab_sets[method]))
 
+    print("Evolución BPE:", bpe_vocab_growth[:10])  # Solo los primeros 10 valores
+    print("Evolución WordPiece:", wordpiece_vocab_growth[:10])
+
+
     # Agregar las evoluciones de WordPiece y BPE preentrenadas
-    vocab_growth["WordPiece"] = wordpiece_vocab_growth[:len(sentences)]
-    vocab_growth["BPE"] = bpe_vocab_growth[:len(sentences)]
+    if len(wordpiece_vocab_growth) >= len(sentences):
+        vocab_growth["WordPiece"] = wordpiece_vocab_growth[:len(sentences)]
+        
+    if len(bpe_vocab_growth) >= len(sentences):
+        vocab_growth["BPE"] = bpe_vocab_growth[:len(sentences)]
+
 
     # Graficar todas las evoluciones
     plt.figure(figsize=(10, 6))
@@ -144,6 +152,7 @@ def compare_tokenization_methods():
     plt.legend()
     plt.grid()
     plt.show()
+
 
 
 
@@ -178,7 +187,7 @@ if __name__ == "__main__":
     if args.print_wordpiece:
         print_wordpiece()
     elif args.compare_methods:
-        compare_tokenization_methods()
+        compare_methods()
     elif args.print_test:
         print_test()
     elif args.print_bpe:
