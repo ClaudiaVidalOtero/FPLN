@@ -1,19 +1,13 @@
-
 import os
 import re
 from typing import Dict, List
-import numpy as np
+
 
 import tensorflow as tf
 import tensorflow.keras.backend as K
 from tensorflow.keras.layers import Dense, Embedding, Input, Lambda 
 from tensorflow.keras.models import Model
 from tensorflow.keras.preprocessing.text import Tokenizer 
-from sklearn.metrics.pairwise import cosine_similarity
-from sklearn.manifold import TSNE
-import matplotlib.pyplot as plt
-from sklearn.model_selection import train_test_split
-
 
 def build_model(vocab_size=10000, embedding_dim=100, context_size=4):
     
@@ -39,11 +33,35 @@ def build_model(vocab_size=10000, embedding_dim=100, context_size=4):
     
     return model
 
+def generar_muestras_desde_secuencia(token_ids, window_size):
 
-def generar_muestras(token_ids, window_size):
+    # Verificamos que la ventana deslizante cumpla las condiciones requeridas
+    if not isinstance(window_size, int) or window_size < 3:
+        raise ValueError("window_size debe ser un entero mayor o igual a 3.")
+    
+    if window_size % 2 == 0:
+        raise ValueError("window_size debe ser un número impar (e.g., 3, 5, 7...).")
+
     context_half_size = (window_size - 1) // 2
-    muestras = [(token_ids[i - context_half_size:i] + token_ids[i + 1:i + 1 + context_half_size], token_ids[i])
-                for i in range(context_half_size, len(token_ids) - context_half_size)]
+    n_tokens = len(token_ids)
+    muestras = []
+
+    # En caso de que no haya suficiente número de tokens
+    if n_tokens < window_size:
+        return []
+
+    for i in range(context_half_size, n_tokens - context_half_size):
+        objetivo_id = token_ids[i]
+
+        contexto_antes = token_ids[i - context_half_size : i]
+        contexto_despues = token_ids[i + 1 : i + context_half_size + 1]
+
+        contexto_ids = contexto_antes + contexto_despues
+
+        # Si el tamaño del contexto es suficiente
+        if len(contexto_ids) == 2 * context_half_size:
+             muestras.append((contexto_ids, objetivo_id))
+
     return muestras
 
 def obtener_contextos_pretokenizados(token_ids, palabras_objetivo, window_size, word_index, index_word):
@@ -55,7 +73,7 @@ def obtener_contextos_pretokenizados(token_ids, palabras_objetivo, window_size, 
 
     # Generamos muestras del contexto 
     try:
-        muestras_enteras = generar_muestras(token_ids, window_size)
+        muestras_enteras = generar_muestras_desde_secuencia(token_ids, window_size)
     except ValueError as e:
         print(f"Error al generar muestras: {e}")
         return {palabra.lower().strip(): [] for palabra in palabras_objetivo if palabra.strip()}
@@ -91,54 +109,6 @@ def obtener_contextos_pretokenizados(token_ids, palabras_objetivo, window_size, 
     return resultados
 
 
-
-def preparar_datos(token_ids, vocab_size, window_size, test_size=0.2, dev_size=0.1):
-    muestras = generar_muestras(token_ids, window_size)
-    train_muestras, test_muestras = train_test_split(muestras, test_size=test_size + dev_size, random_state=42)
-    train_muestras, dev_muestras = train_test_split(train_muestras, test_size=dev_size / (test_size + dev_size), random_state=42)
-    
-    def convertir_muestras(muestras):
-        X = np.array([contexto for contexto, _ in muestras])
-        y = np.array([objetivo for _, objetivo in muestras])
-        y_one_hot = tf.keras.utils.to_categorical(y, num_classes=vocab_size)
-        return X, y_one_hot
-    
-    return convertir_muestras(train_muestras), convertir_muestras(dev_muestras), convertir_muestras(test_muestras)
-
-def entrenar_modelo(token_ids, vocab_size, window_size=5, embedding_dim=100, epochs=10, batch_size=64):
-    (X_train, y_train), (X_dev, y_dev), (X_test, y_test) = preparar_datos(token_ids, vocab_size, window_size)
-    model = build_model(vocab_size, embedding_dim, window_size - 1)
-    model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, validation_data=(X_dev, y_dev))
-    return model, X_test, y_test, model.get_layer("embedding_layer").get_weights()[0]
-
-def calcular_similitud(embedding_layer, word_index, index_word, palabras_objetivo, top_n=10):
-    resultados = {}
-    for palabra in palabras_objetivo:
-        if palabra in word_index:
-            palabra_id = word_index[palabra]
-            vector = embedding_layer[palabra_id].reshape(1, -1)
-            similitudes = cosine_similarity(vector, embedding_layer)[0]
-            palabras_mas_similares = np.argsort(similitudes)[::-1][1:top_n + 1]
-            resultados[palabra] = [index_word.get(idx, f"<ID_{idx}?>") for idx in palabras_mas_similares]
-    return resultados
-
-def visualizar_tsne(embedding_layer, word_index, palabras_objetivo, titulo="Embeddings con t-SNE"):
-    ids = [word_index[palabra] for palabra in palabras_objetivo if palabra in word_index]
-    vectores = np.array([embedding_layer[i] for i in ids])
-    palabras = [palabra for palabra in palabras_objetivo if palabra in word_index]
-    tsne = TSNE(n_components=2, random_state=42)
-    vectores_2d = tsne.fit_transform(vectores)
-    plt.figure(figsize=(10, 6))
-    for i, palabra in enumerate(palabras):
-        plt.scatter(vectores_2d[i, 0], vectores_2d[i, 1], label=palabra)
-        plt.text(vectores_2d[i, 0], vectores_2d[i, 1], palabra, fontsize=12)
-    plt.legend()
-    plt.title(titulo)
-    plt.show()
-
-
-
-"""
 # Cargamos el texto de Harry Potter
 ruta_archivo = os.path.join("datasets", "harry_potter_and_the_philosophers_stone.txt")
 with open(ruta_archivo, 'r', encoding='utf-8') as file:
@@ -159,62 +129,8 @@ vocab_size_hp = len(word_index_hp) + 1
 
 print(f"Tokenización completada.")
 print(f"  - Tamaño del vocabulario: {vocab_size_hp - 1} palabras únicas.")
-print(f"  - Longitud de la secuencia de IDs: {len(token_ids_hp)}")"""
+print(f"  - Longitud de la secuencia de IDs: {len(token_ids_hp)}")
 
-
-###PROBLEMA NO PONE LOS INDICES EN ORDEN EL:2 LA:1
-
-# Datos de prueba: Secuencia de ejemplo (un texto corto para prueba)
-texto_prueba = "el gato se sentó en la alfombra mientras la luna brillaba"
-
-# Tokenizar el texto
-tokenizer = Tokenizer()
-tokenizer.fit_on_texts([texto_prueba])
-token_ids = tokenizer.texts_to_sequences([texto_prueba])[0]
-word_index = tokenizer.word_index
-index_word = {v: k for k, v in word_index.items()}
-vocab_size = len(word_index) + 1  # Para incluir el índice 0
-
-print(f"Vocabulario: {word_index}")
-print(f"Secuencia de tokens: {token_ids}")
-print(f"Índice de palabras: {index_word}")
-
-# Parámetros
-window_size = 3  # Definir una ventana de contexto de tamaño 3
-
-# Generar muestras de contexto y palabra objetivo
-muestras = generar_muestras(token_ids, window_size)
-print(f"Muestras generadas: {muestras}")
-
-# Preparar los datos para el modelo sin entrenarlo
-# Aquí simplemente usamos las muestras generadas y mostramos el resultado
-X, y = zip(*muestras)  # Separar las muestras en X (contextos) y y (palabras objetivo)
-print(f"Contextos de entrenamiento (X): {X}")
-print(f"Palabras objetivo (y): {y}")
-
-# Simular el entrenamiento del modelo con la capa de embeddings
-# Crear un modelo vacío solo para obtener la capa de embeddings
-embedding_dim = 10  # Dimensión de los embeddings
-model = build_model(vocab_size=vocab_size, embedding_dim=embedding_dim, context_size=window_size - 1)
-
-# Como no entrenamos el modelo, inicializamos los pesos aleatoriamente
-embedding_layer = model.get_layer("embedding_layer").get_weights()[0]
-
-# Calcular similitudes semánticas para las palabras objetivo
-palabras_objetivo = ['gato', 'luna']  # Usamos algunas palabras del texto de prueba
-resultados_similitud = calcular_similitud(embedding_layer, word_index, index_word, palabras_objetivo)
-
-print(f"Similitudes semánticas para las palabras objetivo: {resultados_similitud}")
-
-# Visualizar los embeddings de las palabras objetivo usando t-SNE
-visualizar_tsne(embedding_layer, word_index, palabras_objetivo, titulo="Embeddings de palabras objetivo")
-
-
-
-
-
-
-"""
 print("  - Ejemplo del vocabulario:")
 verified_examples = [f"'{word}': {index}" for word, index in word_index_hp.items() if "'" in word or any(c in 'áéíóúüñ' for c in word)][:15]
 print("    " + ", ".join(verified_examples))
@@ -245,4 +161,3 @@ else:
 print("Ejemplo de palabras en el índice:")
 for word in ["sorcerer's", "didn't"]:
     print(f"'{word}': {word_index_hp.get(word, 'No encontrado')}")
-"""
