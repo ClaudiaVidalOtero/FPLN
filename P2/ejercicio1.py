@@ -14,6 +14,7 @@ import tensorflow.keras.backend as K
 from tensorflow.keras import layers
 from tensorflow.keras.preprocessing.text import Tokenizer
 from keras.optimizers import Adam
+from tensorflow.keras.callbacks import EarlyStopping
 
 
 def build_model(vocab_size, embedding_dim, window_size):
@@ -61,25 +62,40 @@ def preparar_datos(token_ids, vocab_size, window_size):
     return convertir_muestras(muestras)
 
 
+
+
 def entrenar_modelo(token_ids, vocab_size, window_size=5, embedding_dim=100, epochs=20, batch_size=128):
-    (X_train, y_train) = preparar_datos(token_ids, vocab_size, window_size)
-    
+    (X, y) = preparar_datos(token_ids, vocab_size, window_size)
+
+    # División en entrenamiento y validación
+    X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.1, random_state=42)
+
     model = build_model(vocab_size, embedding_dim, window_size)
     model.summary()
-    
+    embedding_inicial = model.get_layer("embedding").get_weights()[0]
+    visualizar_tsne(embedding_inicial, word_index_hp, palabras_objetivo, titulo="Embeddings Iniciales con t-SNE")
+
     print(f"\nIniciando entrenamiento por hasta {epochs} épocas...")
-    
-    # Entrenamiento del modelo sin conjunto de validación
-    model.fit(X_train, y_train, epochs=epochs, batch_size=batch_size, verbose=1)
-    
+
+    # Callback de early stopping
+    early_stopping = EarlyStopping(monitor='val_loss', patience=3, restore_best_weights=True)
+
+    model.fit(
+        X_train, y_train,
+        validation_data=(X_val, y_val),
+        epochs=epochs,
+        batch_size=batch_size,
+        callbacks=[early_stopping],
+        verbose=1
+    )
+
     # Obtener la matriz de embeddings
     embedding_weights = model.get_layer("embedding").get_weights()[0]
     print(f"Forma de la matriz de embeddings: {embedding_weights.shape}")
-    
+
     return model, X_train, y_train, embedding_weights
 
-
-def calcular_similitud(embedding_layer, word_index, index_word, palabras_objetivo, top_n=10):
+def calcular_similitud(embedding_layer, word_index, index_word, palabras_objetivo, top_n=10, mostrar=True):
     resultados = {}
     for palabra in palabras_objetivo:
         if palabra in word_index:
@@ -87,8 +103,15 @@ def calcular_similitud(embedding_layer, word_index, index_word, palabras_objetiv
             vector = embedding_layer[palabra_id].reshape(1, -1)
             similitudes = cosine_similarity(vector, embedding_layer)[0]
             palabras_mas_similares = np.argsort(similitudes)[::-1][1:top_n + 1]
-            resultados[palabra] = [index_word.get(idx, f"<ID_{idx}?>") for idx in palabras_mas_similares]
+            similares = [index_word.get(idx, f"<ID_{idx}?>") for idx in palabras_mas_similares]
+            resultados[palabra] = similares
+            if mostrar:
+                print(f"{palabra}: {', '.join(similares)}")
+        else:
+            if mostrar:
+                print(f"{palabra}: [Palabra no encontrada en el vocabulario]")
     return resultados
+
 
 
 def visualizar_tsne(embedding_layer, word_index, palabras_objetivo, titulo="Embeddings con t-SNE"):
@@ -107,12 +130,11 @@ def visualizar_tsne(embedding_layer, word_index, palabras_objetivo, titulo="Embe
     for i, palabra in enumerate(palabras):
         plt.scatter(vectores_2d[i, 0], vectores_2d[i, 1], label=palabra)
         plt.text(vectores_2d[i, 0], vectores_2d[i, 1], palabra, fontsize=12)
-    plt.legend()
     plt.title(titulo)
     plt.show()
 
 
-nombre_archivo = os.path.join("materiales-20250328/target_words_harry_potter.txt")
+nombre_archivo = os.path.join("target_words_harry_potter.txt")
 def leer_palabras_desde_archivo(nombre_archivo):
     with open(nombre_archivo, "r", encoding="utf-8") as archivo:
         palabras = [linea.strip() for linea in archivo if linea.strip()]
@@ -143,3 +165,8 @@ modelo, X_test, y_test, embedding_layer = entrenar_modelo(token_ids_hp, vocab_si
 
 
 visualizar_tsne(embedding_layer, word_index_hp, palabras_objetivo)
+
+
+print("SIMILITUDES DE PALABRAS OBJETIVO:\n")
+
+similares_por_palabra = calcular_similitud(embedding_layer, word_index_hp, index_word_hp, palabras_objetivo)
